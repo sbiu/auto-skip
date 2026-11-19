@@ -1,0 +1,20 @@
+# 构建产物
+build/
+testapp/build/
+dist/
+*.apk
+*.idsig
+*.class
+
+# 截图（含个人界面，不入库）
+shots/
+
+# 签名密钥（本地生成，不入库）
+keystore/
+
+# 系统杂物
+.DS_Store
+Thumbs.db
+
+# 第三方应用的逆向记录（含本机安装痕迹，不入库）
+docs/litiaotiao-reverse.md

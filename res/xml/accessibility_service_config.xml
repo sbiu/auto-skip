@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  与李跳跳保持一致的关键契约（见逆向报告）：
+  - 订阅窗口状态变化 + 窗口内容变化 + 窗口列表变化
+  - notificationTimeout = 100ms，让系统把高频事件合并后才回调，降低唤醒次数
+  - canRetrieveWindowContent: 需要读取节点树才能找到“跳过”
+  - canPerformGestures: 节点不可点击时用坐标点击兜底
+  差异（省电）：李跳跳使用 accessibilityEventTypes=0xffffffff（全部事件）与
+  flagIncludeNotImportantViews；本应用只订阅窗口相关事件，并开启 view-id 上报，
+  以减少无关事件与节点遍历量。
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged|typeWindowsChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagReportViewIds"
+    android:canPerformGestures="true"
+    android:canRetrieveWindowContent="true"
+    android:description="@string/service_description"
+    android:notificationTimeout="100"
+    android:settingsActivity="com.autoskip.app.MainActivity" />

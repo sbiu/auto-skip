@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 跟随系统：系统深色时用这套 -->
+    <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/window_bg</item>
+        <item name="android:colorBackground">@color/window_bg</item>
+        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:statusBarColor">@color/window_bg</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="appBg">@color/window_bg</item>
+        <item name="textSecondary">@color/text_secondary</item>
+        <item name="textHint">@color/text_hint</item>
+        <item name="textBody">@color/text_body</item>
+        <item name="textFooter">@color/text_footer</item>
+        <item name="barBg">@color/bar_bg</item>
+        <item name="barSelected">@color/bar_selected</item>
+        <item name="barText">@color/bar_text</item>
+        <item name="barTextSelected">@color/bar_text_selected</item>
+    </style>
+</resources>

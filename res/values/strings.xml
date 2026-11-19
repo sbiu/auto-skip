@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">张跳跳</string>
+    <string name="service_label">张跳跳 开屏跳过</string>
+    <string name="service_description">仅用于识别并点击各应用开屏广告上的“跳过/关闭广告”按钮。不读取、不保存、不上传任何页面内容。</string>
+
+    <string name="title">张跳跳</string>
+    <string name="subtitle">只做一件事：跳过开屏广告</string>
+
+    <string name="status_on">无障碍服务：已开启</string>
+    <string name="status_off">无障碍服务：未开启</string>
+    <string name="status_paused">无障碍服务：已开启 · 跳过已暂停</string>
+    <string name="switch_label">启用跳过</string>
+    <string name="switch_guard">常驻通知守护（防系统冻结）</string>
+    <string name="hint_guard_notification">通知被收进「更多通知」时：系统设置 → 通知管理 → 张跳跳 → 提升重要性</string>
+    <string name="btn_battery">省电策略：设为无限制</string>
+    <string name="btn_autostart">自启动设置（MIUI）</string>
+    <string name="open_settings">去开启无障碍服务</string>
+    <string name="hint">工作原理：应用进入前台后的 15 秒内（冷启动、从后台/最近任务回来、热启动广告都算），读取当前窗口节点（含浮层窗口），匹配“跳过 / 跳过广告 / 关闭 / 关闭广告 / 4关闭 / skip”等文案并点击；窗口期结束立即停止扫描。关闭上方开关后，服务不再接收任何无障碍事件，零开销。\n\n省电设计：只订阅窗口类事件、100ms 合并、单次前台会话最多扫描 100 次、点击后冷却 1.5 秒、常驻通知守护（可在主界面关闭）、无轮询、无网络权限。</string>
+    <string name="counter_zero">本次安装已跳过 0 次</string>
+    <string name="counter_format">本次安装已跳过 %1$d 次（最近：%2$s）</string>
+    <string name="theme_light">浅色</string>
+    <string name="theme_dark">深色</string>
+    <string name="theme_auto">跟随系统</string>
+    <string name="notif_block">误跳</string>
+    <string name="notif_title_run">已跳过 %1$d 次</string>
+    <string name="notif_title_paused">已暂停跳过</string>
+    <string name="notif_sub_connected">守护中</string>
+    <string name="notif_sub_waiting">等待无障碍连接</string>
+    <string name="notif_sub_paused_fmt">已跳过 %1$d 次</string>
+    <string name="notif_sub_just_skipped">刚跳过 %1$s</string>
+    <string name="notif_toggle_desc">开关跳过</string>
+    <string name="action_pause">暂停跳过</string>
+    <string name="action_resume">恢复跳过</string>
+    <string name="section_excluded">不跳过名单（这些应用/页面不再自动跳过）</string>
+    <string name="btn_add_app">添加应用到不跳过名单</string>
+    <string name="btn_remove">移除</string>
+    <string name="section_recent">最近跳过（误跳了点这里记住）</string>
+    <string name="btn_block_scene">不再跳过此场景</string>
+    <string name="btn_block_app">不再跳过此应用</string>
+    <string name="empty_excluded">暂无，点上方按钮添加应用</string>
+    <string name="empty_recent">还没有跳过记录</string>
+    <string name="dialog_pick_app">选择要排除的应用</string>
+    <string name="footer">v1.9 · 无网络权限 · 不收集任何数据</string>
+</resources>

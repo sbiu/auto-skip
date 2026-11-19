@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <attr name="appBg" format="color" />
+    <attr name="textSecondary" format="color" />
+    <attr name="textHint" format="color" />
+    <attr name="textBody" format="color" />
+    <attr name="textFooter" format="color" />
+    <attr name="barBg" format="color" />
+    <attr name="barSelected" format="color" />
+    <attr name="barText" format="color" />
+    <attr name="barTextSelected" format="color" />
+</resources>

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- 跟随系统：系统浅色时用这套，系统深色时用 values-night 里的版本 -->
+    <style name="AppTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_bg</item>
+        <item name="android:colorBackground">@color/window_bg</item>
+        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:statusBarColor">@color/window_bg</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="appBg">@color/window_bg</item>
+        <item name="textSecondary">@color/text_secondary</item>
+        <item name="textHint">@color/text_hint</item>
+        <item name="textBody">@color/text_body</item>
+        <item name="textFooter">@color/text_footer</item>
+        <item name="barBg">@color/bar_bg</item>
+        <item name="barSelected">@color/bar_selected</item>
+        <item name="barText">@color/bar_text</item>
+        <item name="barTextSelected">@color/bar_text_selected</item>
+    </style>
+
+    <!-- 强制浅色 -->
+    <style name="AppThemeLight" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#FFFFFFFF</item>
+        <item name="android:colorBackground">#FFFFFFFF</item>
+        <item name="android:colorAccent">#FF00897B</item>
+        <item name="android:statusBarColor">#FFFFFFFF</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="appBg">#FFFFFFFF</item>
+        <item name="textSecondary">#FF666666</item>
+        <item name="textHint">#FF888888</item>
+        <item name="textBody">#FF444444</item>
+        <item name="textFooter">#FF999999</item>
+        <item name="barBg">#FFF4F4F4</item>
+        <item name="barSelected">#FFDFF3F0</item>
+        <item name="barText">#FF444444</item>
+        <item name="barTextSelected">#FF00695C</item>
+    </style>
+
+    <!-- 强制深色 -->
+    <style name="AppThemeDark" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#FF121212</item>
+        <item name="android:colorBackground">#FF121212</item>
+        <item name="android:colorAccent">#FF4DB6AC</item>
+        <item name="android:statusBarColor">#FF121212</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="appBg">#FF121212</item>
+        <item name="textSecondary">#FFB0B0B0</item>
+        <item name="textHint">#FF9E9E9E</item>
+        <item name="textBody">#FFC7C7C7</item>
+        <item name="textFooter">#FF8A8A8A</item>
+        <item name="barBg">#FF1E1E1E</item>
+        <item name="barSelected">#FF1F3B36</item>
+        <item name="barText">#FFCCCCCC</item>
+        <item name="barTextSelected">#FF4DB6AC</item>
+    </style>
+
+</resources>
