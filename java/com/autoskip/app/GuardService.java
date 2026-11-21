@@ -204,7 +204,10 @@ public class GuardService extends Service {
 
     /** 无障碍在系统设置里仍开启、但服务连接丢了：杀掉自己让系统重新 bind。 */
     private void restartProcessToRebind(long now) {
-        if (now - lastRebootAt < REBOOT_COOLDOWN_MS) {
+        if (lastRebootAt > now) {
+            lastRebootAt = 0;
+        }
+        if (lastRebootAt > 0 && now - lastRebootAt < REBOOT_COOLDOWN_MS) {
             return;
         }
         lastRebootAt = now;
@@ -213,7 +216,7 @@ public class GuardService extends Service {
             getSharedPreferences("auto_skip", MODE_PRIVATE).edit()
                     .putLong("guard_last_reboot", now)
                     .putLong("guard_last_reboot_wall", System.currentTimeMillis())
-                    .apply();
+                    .commit();
         } catch (Throwable ignored) {
         }
         Log.i(TAG, "a11y connected=false for 60s, restarting process to force rebind");

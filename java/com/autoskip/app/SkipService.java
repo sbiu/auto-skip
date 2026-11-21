@@ -21,24 +21,24 @@ import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityWindowInfo;
+import android.view.inputmethod.InputMethodInfo;
+import android.view.inputmethod.InputMethodManager;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
- * 开屏广告跳过服务（v1.3，前台会话模型）。
+ * 开屏广告跳过服务（v1.3+，前台会话模型 + 延迟加载脉冲补扫 + 点击回查兜底）。
  *
  * 行为契约：
  *  - 监听窗口状态变化 / 窗口内容变化 / 窗口列表变化；
  *  - 只在“应用进入前台”后的 15 秒会话内工作，其余时间回到事件回调直接 return；
- *  - 一次会话最多成功跳过 1 次（避免广告关闭后的界面切换重复计数/误点）。
- *
- * 为什么是“会话”而不是 v1.2 的 arm/deadline：
- *  - 杀进程重开、从后台/最近任务回到前台、热启动广告，都不一定产生新的
- *    TYPE_WINDOW_STATE_CHANGED；v1.2 依赖 lastEventPackage 的门槛会让这些情况下
- *    永远不开窗口（热启动不跳），而“刚跳过 8 秒内不再开窗口”又会让快速重开
- *    一次跳一次不跳。会话模型只认两个信号：包名变化、或距上一条应用事件超过 1.2 秒。
+ *  - 启动前 4.2 秒内执行轻量脉冲补扫，覆盖 1.2s~3.5s 才渲染出的延迟开屏广告；
+ *  - ACTION_CLICK 后 320ms 自动回查，若广告 SDK 拦截了无坐标点击则自动降级为手势坐标点击；
+ *  - 一次会话最多记 1 次跳过（避免广告关闭后的界面切换重复计数/误点）。
  */
 public class SkipService extends AccessibilityService {
 
@@ -51,15 +51,19 @@ public class SkipService extends AccessibilityService {
 
     /** 进入前台后最多工作 15 秒。 */
     private static final long SESSION_WINDOW_MS = 15_000L;
+    /** 启动期脉冲补扫窗口：覆盖冷启动 1~4 秒才渲染出开屏广告的应用（知乎/微博/B站/虎扑）。 */
+    private static final long PULSE_WINDOW_MS = 4_200L;
+    private static final long PULSE_INTERVAL_MS = 300L;
     /** 距上一条“应用事件”超过这个时间，视为一次新的前台会话（切出过/回后台/热启动）。 */
     private static final long SESSION_GAP_MS = 1_200L;
-    private static final long MIN_SCAN_INTERVAL_MS = 120L;
-    private static final long MIN_SETTLE_MS = 120L;
+    private static final long MIN_SCAN_INTERVAL_MS = 110L;
+    private static final long MIN_SETTLE_MS = 100L;
     private static final int MAX_SCANS = 100;
     private static final int MAX_GESTURE_ATTEMPTS = 4;
-    private static final long GESTURE_RETRY_MS = 400L;
-    /** 只用于 ACTION_CLICK 后的立刻防抖，不再阻塞重新开会话。 */
-    private static final long CLICK_COOLDOWN_MS = 1_500L;
+    private static final long GESTURE_RETRY_MS = 360L;
+    /** ACTION_CLICK 后的回查间隔：若广告仍在屏则自动降级为手势坐标点击。 */
+    private static final long ACTION_VERIFY_MS = 320L;
+    private static final long CLICK_COOLDOWN_MS = 260L;
     private static final boolean DEBUG = false;
 
     /** 最近一次成功跳过的信息（GuardService 的「误跳？屏蔽」用）。 */
@@ -79,7 +83,7 @@ public class SkipService extends AccessibilityService {
         return connected && instance != null;
     }
 
-    /** 给 GuardService 探活：a11y 客户端假死时 getRootInActiveWindow() 会一直拿不到根节点。 */
+    /** 给 GuardService 探活：a11y 客户端假死时拿不到有效根节点（或只返回 0 子节点空壳）。 */
     static boolean probeAlive() {
         SkipService s = instance;
         if (s == null) {
@@ -87,10 +91,22 @@ public class SkipService extends AccessibilityService {
         }
         try {
             AccessibilityNodeInfo root = s.getRootInActiveWindow();
-            return root != null;
+            return isValidRoot(root);
         } catch (Throwable t) {
             return false;
         }
+    }
+
+    private static boolean isValidRoot(AccessibilityNodeInfo root) {
+        if (root == null) {
+            return false;
+        }
+        if (root.getChildCount() > 0 || root.getClassName() != null) {
+            return true;
+        }
+        Rect r = new Rect();
+        root.getBoundsInScreen(r);
+        return r.width() > 0 && r.height() > 0;
     }
 
     private static final int CLICK_NONE = 0;
@@ -98,6 +114,7 @@ public class SkipService extends AccessibilityService {
     private static final int CLICK_ACTION = 2;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Set<String> imePackages = new HashSet<>();
 
     // ---- 前台会话状态 ----
     private String foregroundPackage;
@@ -109,10 +126,11 @@ public class SkipService extends AccessibilityService {
     private long lastActionClickAt;
     private int scanCount;
     private int sessionIndex;
+    private int actionAttempts;
     private int gestureAttempts;
     private boolean recorded;
     private boolean clickedThisSession;
-    private boolean snapshotSaved;
+    private int snapshotNodeCount;
     private boolean receiverRegistered;
 
     private int screenWidth;
@@ -123,7 +141,28 @@ public class SkipService extends AccessibilityService {
     private final Runnable delayedScan = new Runnable() {
         @Override
         public void run() {
-            scanInternal(SystemClock.uptimeMillis());
+            long now = SystemClock.uptimeMillis();
+            // 自愈校验：若屏幕上真实顶层窗口已变成另一个目标应用（此前被旧应用退场事件抢走会话），立即纠正到真实顶层应用
+            String activeGuiPkg = getRawActiveWindowPackage();
+            if (activeGuiPkg != null && !activeGuiPkg.isEmpty()) {
+                if (isIgnoredPackage(activeGuiPkg)) {
+                    // 已经回到桌面或本应用：结束残留会话，不覆盖 lastScan
+                    if (activeGuiPkg.equals(getPackageName())
+                            || (homePackage != null && activeGuiPkg.equals(homePackage))
+                            || "com.miui.home".equals(activeGuiPkg)) {
+                        endSession();
+                        return;
+                    }
+                } else if (!activeGuiPkg.equals(foregroundPackage)) {
+                    startSession(activeGuiPkg, now, true);
+                }
+            }
+            scanInternal(now, null);
+            if (foregroundPackage != null && !clickedThisSession
+                    && now - sessionStartedAt < PULSE_WINDOW_MS) {
+                handler.removeCallbacks(this);
+                handler.postDelayed(this, PULSE_INTERVAL_MS);
+            }
         }
     };
 
@@ -154,19 +193,11 @@ public class SkipService extends AccessibilityService {
                 return;
             }
             try {
-                AccessibilityNodeInfo root = getRootInActiveWindow();
-                if (root == null) {
+                String pkg = getActiveAppPackage();
+                if (pkg == null || pkg.isEmpty() || isIgnoredPackage(pkg)) {
                     return;
                 }
-                CharSequence p = root.getPackageName();
-                if (p == null) {
-                    return;
-                }
-                String pkg = p.toString();
-                if (pkg.isEmpty() || isIgnoredPackage(pkg)) {
-                    return;
-                }
-                startSession(pkg, SystemClock.uptimeMillis());
+                startSession(pkg, SystemClock.uptimeMillis(), true);
                 if (DEBUG) {
                     Log.i(TAG, "heal session " + pkg);
                 }
@@ -198,6 +229,7 @@ public class SkipService extends AccessibilityService {
         super.onServiceConnected();
         powerManager = (PowerManager) getSystemService(POWER_SERVICE);
         updateScreenSize();
+        refreshImePackages();
         try {
             Intent home = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
             ResolveInfo ri = getPackageManager().resolveActivity(home, 0);
@@ -216,7 +248,7 @@ public class SkipService extends AccessibilityService {
         SkipRules.load(this);
         registerStateReceiver();
         applyEnabled();
-        handler.postDelayed(healOnConnect, 500);
+        handler.postDelayed(healOnConnect, 350);
         connected = true;
         instance = this;
         try {
@@ -229,6 +261,24 @@ public class SkipService extends AccessibilityService {
             GuardService.refresh(this);
         }
         Log.i(TAG, "service connected, home=" + homePackage + " enabled=" + SkipState.isEnabled());
+    }
+
+    private void refreshImePackages() {
+        imePackages.clear();
+        try {
+            InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                List<InputMethodInfo> list = imm.getInputMethodList();
+                if (list != null) {
+                    for (InputMethodInfo imi : list) {
+                        if (imi != null && imi.getPackageName() != null) {
+                            imePackages.add(imi.getPackageName());
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
     }
 
     private void registerStateReceiver() {
@@ -261,12 +311,9 @@ public class SkipService extends AccessibilityService {
                     | AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
                     | AccessibilityEvent.TYPE_WINDOWS_CHANGED)
                     : 0;
-            // 开屏广告的“跳过”经常被标记为 not-important，默认过滤掉后节点树里根本看不到；
-            // 关掉开关时不改 flags（事件已为 0，系统不会派发，零开销）。
             if (SkipState.isEnabled()) {
                 info.flags |= AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS;
                 info.flags |= AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS;
-                // 没有这个 flag，getWindows() 只会返回空列表，看不见浮层里的开屏广告
                 info.flags |= AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS;
             }
             setServiceInfo(info);
@@ -308,21 +355,56 @@ public class SkipService extends AccessibilityService {
             Log.i(TAG, "state " + pkg + " cls=" + event.getClassName());
         }
         if (isIgnoredPackage(pkg)) {
+            if (pkg.equals(getPackageName())
+                    || (homePackage != null && pkg.equals(homePackage))
+                    || "com.miui.home".equals(pkg)) {
+                String activeNow = getRawActiveWindowPackage();
+                if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                        || pkg.equals(activeNow)) {
+                    endSession();
+                }
+            }
             return;
         }
 
+        long now = SystemClock.uptimeMillis();
+        // 核对当前屏幕真实活动窗口：防止旧应用退场时的尾随事件反抢新应用会话，或回桌面时的退场事件假开新会话
+        String rawActivePkg = getRawActiveWindowPackage();
+        if (rawActivePkg != null && !rawActivePkg.isEmpty() && !pkg.equals(rawActivePkg)) {
+            if (rawActivePkg.equals(getPackageName())
+                    || (homePackage != null && rawActivePkg.equals(homePackage))
+                    || "com.miui.home".equals(rawActivePkg)) {
+                // 屏幕顶层已经是桌面或张跳跳自身，忽略退场应用的尾随事件
+                return;
+            }
+            if (!isIgnoredPackage(rawActivePkg)) {
+                // 屏幕顶层是另一个真实应用（如刚切入的知乎/微博/B站/虎扑），以真实顶层应用为准
+                if (event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+                    pkg = rawActivePkg;
+                }
+            }
+        }
+
+        boolean pkgChanged = !pkg.equals(foregroundPackage);
+        if (pkgChanged && foregroundPackage != null && !clickedThisSession
+                && now - sessionStartedAt < PULSE_WINDOW_MS
+                && event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            String activePkg = getActiveAppPackage();
+            if (foregroundPackage.equals(activePkg)) {
+                return;
+            }
+        }
+
+        boolean newSession = pkgChanged || now - lastAppEventAt > SESSION_GAP_MS;
+        if (newSession) {
+            startSession(pkg, now, pkgChanged);
+        }
         if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             String cls = event.getClassName() == null ? null : event.getClassName().toString();
             // 只记 Activity 类名：窗口事件里还会掺 View/FrameLayout 之类，会把真实页面覆盖掉
             if (looksLikeActivity(cls)) {
                 foregroundClass = cls;
             }
-        }
-        long now = SystemClock.uptimeMillis();
-        boolean newSession = !pkg.equals(foregroundPackage)
-                || now - lastAppEventAt > SESSION_GAP_MS;
-        if (newSession) {
-            startSession(pkg, now);
         }
         lastAppEventAt = now;
 
@@ -350,7 +432,7 @@ public class SkipService extends AccessibilityService {
         if (powerManager != null && !powerManager.isInteractive()) {
             return;
         }
-        scanInternal(now);
+        scanInternal(now, event);
     }
 
     private boolean looksLikeActivity(String cls) {
@@ -362,20 +444,23 @@ public class SkipService extends AccessibilityService {
                 && !cls.startsWith("com.android.internal.");
     }
 
-    private void startSession(String pkg, long now) {
+    private void startSession(String pkg, long now, boolean resetClass) {
         foregroundPackage = pkg;
+        if (resetClass) {
+            foregroundClass = null;
+        }
         sessionStartedAt = now;
         sessionIndex++;
         scanCount = 0;
+        actionAttempts = 0;
         gestureAttempts = 0;
         recorded = false;
         clickedThisSession = false;
-        snapshotSaved = false;
+        snapshotNodeCount = 0;
         lastScanAt = 0;
         handler.removeCallbacks(delayedScan);
-        // 开屏广告常常在首帧之后才 inflate，补两次延迟扫描覆盖这种情况
+        // 启动前 4.2 秒内执行脉冲延迟扫描，覆盖延迟渲染的开屏广告
         handler.postDelayed(delayedScan, MIN_SETTLE_MS + 60);
-        handler.postDelayed(delayedScan, 900);
         if (DEBUG) {
             Log.i(TAG, "session#" + sessionIndex + " " + pkg);
         }
@@ -383,12 +468,20 @@ public class SkipService extends AccessibilityService {
 
     private void endSession() {
         foregroundPackage = null;
+        foregroundClass = null;
         clickedThisSession = true;
         handler.removeCallbacks(delayedScan);
     }
 
     private boolean isIgnoredPackage(String pkg) {
         if (pkg.equals(getPackageName())) {
+            return true;
+        }
+        if (imePackages.contains(pkg)
+                || pkg.contains(".inputmethod")
+                || pkg.startsWith("com.sohu.inputmethod")
+                || pkg.startsWith("com.baidu.input")
+                || pkg.equals("com.tencent.wetype")) {
             return true;
         }
         if (pkg.equals("android")
@@ -399,13 +492,49 @@ public class SkipService extends AccessibilityService {
                 || pkg.equals("com.miui.aod")
                 || pkg.equals("com.miui.personalassistant")
                 || pkg.equals("com.android.quicksearchbox")
-                || pkg.equals("com.google.android.googlequicksearchbox")) {
+                || pkg.equals("com.google.android.googlequicksearchbox")
+                || pkg.equals("com.miui.weather2")
+                || pkg.equals("com.miui.notification")
+                || pkg.equals("com.miui.misound")
+                || pkg.equals("com.miui.audiomonitor")
+                || pkg.equals("com.xiaomi.barrage")
+                || pkg.equals("com.miui.touchassistant")
+                || pkg.equals("com.miui.contentcatcher")
+                || pkg.equals("com.xiaomi.aiasst.vision")
+                || pkg.equals("com.xiaomi.aiasst.service")
+                || pkg.equals("com.miui.securitycore")
+                || pkg.equals("com.miui.powerkeeper")
+                || pkg.equals("com.miui.cleanmaster")
+                || pkg.equals("com.miui.screenrecorder")
+                || pkg.equals("com.miui.voiceassist")
+                || pkg.equals("com.android.permissioncontroller")
+                || pkg.equals("com.google.android.permissioncontroller")
+                || pkg.equals("dev.local.dailycheckin")) {
             return true;
         }
         return homePackage != null && homePackage.equals(pkg);
     }
 
-    private void scanInternal(long now) {
+    private String getRawActiveWindowPackage() {
+        try {
+            AccessibilityNodeInfo active = getRootInActiveWindow();
+            if (active != null && active.getPackageName() != null) {
+                String p = active.getPackageName().toString();
+                if (!p.isEmpty()) {
+                    return p;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
+    }
+
+    private String getActiveAppPackage() {
+        String p = getRawActiveWindowPackage();
+        return (p != null && !isIgnoredPackage(p)) ? p : null;
+    }
+
+    private void scanInternal(long now, AccessibilityEvent triggerEvent) {
         if (foregroundPackage == null || clickedThisSession) {
             return;
         }
@@ -424,21 +553,31 @@ public class SkipService extends AccessibilityService {
         if (lastScanAt != 0 && now - lastScanAt < MIN_SCAN_INTERVAL_MS) {
             return;
         }
+        if (lastActionClickAt != 0 && now - lastActionClickAt < CLICK_COOLDOWN_MS) {
+            return;
+        }
         if (powerManager != null && !powerManager.isInteractive()) {
+            return;
+        }
+
+        List<AccessibilityNodeInfo> roots = collectRoots(foregroundPackage, triggerEvent);
+        if (roots.isEmpty()) {
+            // 窗口正在切换、根节点尚未就绪：不扣减节流时间与扫描额度，保证下一条就绪事件可立即扫描
+            if (DEBUG) {
+                Log.i(TAG, "scan " + foregroundPackage + " no window");
+            }
+            if (scanCount == 0) {
+                SkipState.lastScan = "旧窗口（等待 " + foregroundPackage + "）";
+            }
+            if (now - sessionStartedAt < PULSE_WINDOW_MS) {
+                handler.removeCallbacks(delayedScan);
+                handler.postDelayed(delayedScan, 160);
+            }
             return;
         }
 
         lastScanAt = now;
         scanCount++;
-
-        List<AccessibilityNodeInfo> roots = collectRoots(foregroundPackage);
-        if (roots.isEmpty()) {
-            if (DEBUG) {
-                Log.i(TAG, "scan " + foregroundPackage + " no window");
-            }
-            SkipState.lastScan = "旧窗口（等待 " + foregroundPackage + "）";
-            return;
-        }
 
         AccessibilityNodeInfo target = null;
         for (AccessibilityNodeInfo root : roots) {
@@ -463,17 +602,18 @@ public class SkipService extends AccessibilityService {
             }
         }
         if (target == null) {
+            // 点击（ACTION_CLICK 或手势）后回查发现“跳过”按钮已消失，确认跳过完成并结束会话
+            if (actionAttempts > 0 || gestureAttempts > 0) {
+                recordOnce(foregroundPackage);
+                clickedThisSession = true;
+                handler.removeCallbacks(delayedScan);
+                return;
+            }
             SkipState.lastScan = foregroundPackage + " 会话#" + sessionIndex + " 第" + scanCount
                     + "次扫描：未命中（" + roots.size() + " 个窗口）";
             saveSnapshot(roots);
             if (DEBUG) {
                 dumpTree(roots.get(0));
-            }
-            // 手势点击后广告消失，说明已经跳过；补记一次
-            if (gestureAttempts > 0) {
-                recordOnce(foregroundPackage);
-                clickedThisSession = true;
-                handler.removeCallbacks(delayedScan);
             }
             return;
         }
@@ -489,10 +629,12 @@ public class SkipService extends AccessibilityService {
             return;
         }
         if (result == CLICK_ACTION) {
+            actionAttempts++;
             lastActionClickAt = now;
             recordOnce(skipped);
-            clickedThisSession = true;
+            // 不立即锁死 clickedThisSession：320ms 后回查一次，若广告 SDK 忽略了 ACTION_CLICK 则自动降级为手势坐标点击
             handler.removeCallbacks(delayedScan);
+            handler.postDelayed(delayedScan, ACTION_VERIFY_MS);
             return;
         }
         // 手势是异步的：完成后回查一次，广告还在就再点，消失则结束
@@ -505,15 +647,14 @@ public class SkipService extends AccessibilityService {
     }
 
     /**
-     * 收集当前前台包名下的所有窗口根节点。
-     * 很多开屏广告（微博、部分广告 SDK）不是新 Activity，而是浮在主界面之上的独立窗口；
-     * 只读 getRootInActiveWindow() 会一直拿到下面的主界面，永远看不到“跳过”。
+     * 收集当前前台包名下的所有有效窗口根节点。
+     * 综合 getRootInActiveWindow()、getWindows()（浮层广告）与 event.getSource() 回溯兜底。
      */
-    private List<AccessibilityNodeInfo> collectRoots(String pkg) {
+    private List<AccessibilityNodeInfo> collectRoots(String pkg, AccessibilityEvent triggerEvent) {
         List<AccessibilityNodeInfo> roots = new ArrayList<>(4);
         try {
             AccessibilityNodeInfo active = getRootInActiveWindow();
-            if (active != null) {
+            if (isValidRoot(active)) {
                 roots.add(active);
             }
         } catch (Throwable ignored) {
@@ -530,7 +671,7 @@ public class SkipService extends AccessibilityService {
                         root = window.getRoot();
                     } catch (Throwable ignored) {
                     }
-                    if (root == null || containsSameRoot(roots, root)) {
+                    if (!isValidRoot(root) || containsSameRoot(roots, root)) {
                         continue;
                     }
                     roots.add(root);
@@ -543,6 +684,26 @@ public class SkipService extends AccessibilityService {
             CharSequence rootPkg = root.getPackageName();
             if (pkg != null && rootPkg != null && pkg.equals(rootPkg.toString())) {
                 mine.add(root);
+            }
+        }
+        if (mine.isEmpty() && triggerEvent != null) {
+            try {
+                AccessibilityNodeInfo src = triggerEvent.getSource();
+                if (src != null) {
+                    AccessibilityNodeInfo top = src;
+                    for (int i = 0; i < 30; i++) {
+                        AccessibilityNodeInfo p = top.getParent();
+                        if (p == null) {
+                            break;
+                        }
+                        top = p;
+                    }
+                    CharSequence topPkg = top.getPackageName();
+                    if (pkg != null && topPkg != null && pkg.equals(topPkg.toString()) && isValidRoot(top)) {
+                        mine.add(top);
+                    }
+                }
+            } catch (Throwable ignored) {
             }
         }
         return mine;
@@ -558,30 +719,41 @@ public class SkipService extends AccessibilityService {
     }
 
     private int click(AccessibilityNodeInfo node) {
-        AccessibilityNodeInfo cur = node;
-        for (int depth = 0; depth < 4 && cur != null; depth++) {
-            if (cur.isClickable() && cur.isEnabled()) {
-                if (cur.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-                    if (DEBUG) {
-                        Log.i(TAG, "click-node depth=" + depth + " cls=" + cur.getClassName());
+        // 若此前已尝试过 ACTION_CLICK 但“跳过”节点仍在，说明该广告 SDK 要求真实触摸坐标，直接走手势点击
+        if (actionAttempts == 0) {
+            AccessibilityNodeInfo cur = node;
+            Rect cb = new Rect();
+            for (int depth = 0; depth < 4 && cur != null; depth++) {
+                if (depth > 0 && screenWidth > 0 && screenHeight > 0) {
+                    cur.getBoundsInScreen(cb);
+                    // 防止向上回溯到半屏/全屏的广告海报容器导致误点广告
+                    if (cb.width() > screenWidth / 2 || cb.height() > screenHeight / 8) {
+                        break;
                     }
-                    return CLICK_ACTION;
                 }
-                break;
+                if (cur.isClickable() && cur.isEnabled()) {
+                    if (cur.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                        if (DEBUG) {
+                            Log.i(TAG, "click-node depth=" + depth + " cls=" + cur.getClassName());
+                        }
+                        return CLICK_ACTION;
+                    }
+                    break;
+                }
+                AccessibilityNodeInfo parent = cur.getParent();
+                if (parent == null) {
+                    break;
+                }
+                cur = parent;
             }
-            AccessibilityNodeInfo parent = cur.getParent();
-            if (parent == null) {
-                break;
-            }
-            cur = parent;
         }
         if (DEBUG) {
-            Log.i(TAG, "click-node failed, fallback to gesture");
+            Log.i(TAG, "click-node skipped/failed, fallback to gesture");
         }
         return gestureTap(node) ? CLICK_GESTURE : CLICK_NONE;
     }
 
-    /** 节点不可点击（很多开屏广告用非 clickable 的 TextView）时的兜底：坐标点击。 */
+    /** 节点不可点击或广告 SDK 拦截虚拟点击时的兜底：真实坐标轻点。 */
     private boolean gestureTap(AccessibilityNodeInfo node) {
         Rect bounds = new Rect();
         node.getBoundsInScreen(bounds);
@@ -591,7 +763,7 @@ public class SkipService extends AccessibilityService {
         Path path = new Path();
         path.moveTo(bounds.centerX(), bounds.centerY());
         GestureDescription.StrokeDescription stroke =
-                new GestureDescription.StrokeDescription(path, 0, 60);
+                new GestureDescription.StrokeDescription(path, 0, 55);
         GestureDescription gesture = new GestureDescription.Builder().addStroke(stroke).build();
         try {
             return dispatchGesture(gesture, new GestureResultCallback() {
@@ -608,6 +780,7 @@ public class SkipService extends AccessibilityService {
                         clickedThisSession = true;
                     } else {
                         // 回查一次：广告还在就再点，消失则结束
+                        handler.removeCallbacks(delayedScan);
                         handler.postDelayed(delayedScan, GESTURE_RETRY_MS);
                     }
                 }
@@ -618,7 +791,8 @@ public class SkipService extends AccessibilityService {
                         Log.i(TAG, "gesture cancelled");
                     }
                     if (foregroundPackage != null) {
-                        handler.postDelayed(delayedScan, 250);
+                        handler.removeCallbacks(delayedScan);
+                        handler.postDelayed(delayedScan, 220);
                     }
                 }
             }, null);
@@ -662,18 +836,14 @@ public class SkipService extends AccessibilityService {
 
     /**
      * 未命中时把当前窗口前 40 个节点的结构存进 SharedPreferences，主界面诊断区可查看。
-     * 广告模板再变化时，直接看这份快照就能定位新的“跳过/关闭”节点（仅本地，不上传）。
+     * 若同一会话后续扫描拿到了更完整的节点树（例如从 9 节点的启动底图进入 30 节点的广告页），自动更新快照。
      */
     private void saveSnapshot(List<AccessibilityNodeInfo> roots) {
-        if (snapshotSaved) {
-            return;
-        }
-        snapshotSaved = true;
         try {
             StringBuilder sb = new StringBuilder();
             int n = 0;
             for (AccessibilityNodeInfo root : roots) {
-                if (root == null) {
+                if (!isValidRoot(root)) {
                     continue;
                 }
                 sb.append("== window ").append(root.getPackageName()).append(" ==\n");
@@ -699,6 +869,10 @@ public class SkipService extends AccessibilityService {
                     }
                 }
             }
+            if (n <= 1 || n <= snapshotNodeCount) {
+                return;
+            }
+            snapshotNodeCount = n;
             getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                     .putString("dbg_tree", sb.toString()).apply();
         } catch (Throwable ignored) {

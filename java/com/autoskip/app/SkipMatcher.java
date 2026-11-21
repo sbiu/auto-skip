@@ -113,8 +113,10 @@ final class SkipMatcher {
             int cy = bounds.centerY();
             if (cy < screenHeight * 0.30f && cx > screenWidth * 0.55f) {
                 corner = 10; // 右上角：绝大多数开屏广告的“跳过”
-            } else if (cy > screenHeight * 0.80f && cx > screenWidth * 0.50f) {
-                corner = 8;  // 右下角：微博等少数模板
+            } else if (cy > screenHeight * 0.72f && cx > screenWidth * 0.50f) {
+                corner = 8;  // 右下角：微博等模板（部分在底部半屏卡片上方，约 72%~96% 屏高）
+            } else if (cy < screenHeight * 0.25f && cx < screenWidth * 0.45f) {
+                corner = 8;  // 左上角：少数开屏广告模板
             }
             score += corner;
 
@@ -194,7 +196,7 @@ final class SkipMatcher {
         }
         int idx = viewId.indexOf(":id/");
         String name = (idx >= 0 ? viewId.substring(idx + 4) : viewId).toLowerCase(Locale.ROOT);
-        if (name.contains("skip")) {
+        if (name.contains("skip") || name.contains("jump")) {
             return 12;
         }
         if (name.contains("ad_close") || name.contains("splash_close") || name.contains("close_ad")) {
