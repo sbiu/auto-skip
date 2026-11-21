@@ -1,18 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 浅色 -->
-    <color name="window_bg">#FFFFFFFF</color>
-    <color name="text_secondary">#FF666666</color>
-    <color name="text_hint">#FF888888</color>
-    <color name="text_body">#FF444444</color>
-    <color name="text_footer">#FF999999</color>
-    <color name="bar_bg">#FFF4F4F4</color>
-    <color name="bar_selected">#FFDFF3F0</color>
-    <color name="bar_text">#FF444444</color>
-    <color name="bar_text_selected">#FF00695C</color>
-    <color name="accent">#FF00897B</color>
+    <!-- 浅色：瓷白层次 + 品牌钴蓝 -->
+    <color name="window_bg">#FFF4F6FA</color>
+    <color name="card_bg">#FFFFFFFF</color>
+    <color name="card_stroke">#FFE6EAF2</color>
+    <color name="surface_subtle">#FFEEF2F8</color>
+    <color name="divider_color">#FFEDF1F7</color>
 
-    <!-- 通知栏（跟随系统深浅色） -->
+    <color name="text_primary">#FF0F172A</color>
+    <color name="text_secondary">#FF475569</color>
+    <color name="text_hint">#FF94A3B8</color>
+    <color name="text_body">#FF334155</color>
+    <color name="text_footer">#FF94A3B8</color>
+
+    <color name="accent">#FF1C6BFF</color>
+    <color name="accent_soft">#FFEBF2FF</color>
+    <color name="accent_text">#FF1557D6</color>
+
+    <color name="ok_color">#FF0D9F6E</color>
+    <color name="ok_soft">#FFE6F7F0</color>
+    <color name="warn_color">#FFD97706</color>
+    <color name="warn_soft">#FFFEF3E2</color>
+    <color name="danger_color">#FFE11D48</color>
+    <color name="danger_soft">#FFFFEBEF</color>
+    <color name="switch_track_off">#FFCBD5E1</color>
+
+    <color name="hero_start">#FF1C6BFF</color>
+    <color name="hero_end">#FF114CC9</color>
+    <color name="hero_paused_start">#FF475569</color>
+    <color name="hero_paused_end">#FF334155</color>
+    <color name="hero_warn_start">#FFD97706</color>
+    <color name="hero_warn_end">#FFB45309</color>
+    <color name="hero_alert_start">#FFE11D48</color>
+    <color name="hero_alert_end">#FFBE123C</color>
+
+    <!-- 兼容旧命名 -->
+    <color name="bar_bg">#FFEEF2F8</color>
+    <color name="bar_selected">#FFEBF2FF</color>
+    <color name="bar_text">#FF475569</color>
+    <color name="bar_text_selected">#FF1557D6</color>
+
+    <!-- 通知栏（跟随系统深浅色，保持 GuardService 与旧资源兼容） -->
     <color name="notif_title">#FF1A1A1A</color>
     <color name="notif_text">#FF666666</color>
     <color name="notif_chip_bg">#33FFB300</color>

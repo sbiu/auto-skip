@@ -1,10 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- 页面与卡片层级 -->
     <attr name="appBg" format="color" />
+    <attr name="cardBg" format="color" />
+    <attr name="cardStroke" format="color" />
+    <attr name="surfaceSubtle" format="color" />
+    <attr name="dividerColor" format="color" />
+
+    <!-- 文字层级 -->
+    <attr name="textPrimary" format="color" />
     <attr name="textSecondary" format="color" />
     <attr name="textHint" format="color" />
     <attr name="textBody" format="color" />
     <attr name="textFooter" format="color" />
+
+    <!-- 品牌与语义色 -->
+    <attr name="accentColor" format="color" />
+    <attr name="accentSoft" format="color" />
+    <attr name="accentText" format="color" />
+    <attr name="okColor" format="color" />
+    <attr name="okSoft" format="color" />
+    <attr name="warnColor" format="color" />
+    <attr name="warnSoft" format="color" />
+    <attr name="dangerColor" format="color" />
+    <attr name="dangerSoft" format="color" />
+    <attr name="switchTrackOff" format="color" />
+
+    <!-- Hero 主卡片渐变 -->
+    <attr name="heroStart" format="color" />
+    <attr name="heroEnd" format="color" />
+    <attr name="heroPausedStart" format="color" />
+    <attr name="heroPausedEnd" format="color" />
+    <attr name="heroWarnStart" format="color" />
+    <attr name="heroWarnEnd" format="color" />
+    <attr name="heroAlertStart" format="color" />
+    <attr name="heroAlertEnd" format="color" />
+
+    <!-- 兼容旧属性名 -->
     <attr name="barBg" format="color" />
     <attr name="barSelected" format="color" />
     <attr name="barText" format="color" />

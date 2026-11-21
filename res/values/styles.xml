@@ -7,12 +7,36 @@
         <item name="android:colorBackground">@color/window_bg</item>
         <item name="android:colorAccent">@color/accent</item>
         <item name="android:statusBarColor">@color/window_bg</item>
+        <item name="android:navigationBarColor">@color/window_bg</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="appBg">@color/window_bg</item>
+        <item name="cardBg">@color/card_bg</item>
+        <item name="cardStroke">@color/card_stroke</item>
+        <item name="surfaceSubtle">@color/surface_subtle</item>
+        <item name="dividerColor">@color/divider_color</item>
+        <item name="textPrimary">@color/text_primary</item>
         <item name="textSecondary">@color/text_secondary</item>
         <item name="textHint">@color/text_hint</item>
         <item name="textBody">@color/text_body</item>
         <item name="textFooter">@color/text_footer</item>
+        <item name="accentColor">@color/accent</item>
+        <item name="accentSoft">@color/accent_soft</item>
+        <item name="accentText">@color/accent_text</item>
+        <item name="okColor">@color/ok_color</item>
+        <item name="okSoft">@color/ok_soft</item>
+        <item name="warnColor">@color/warn_color</item>
+        <item name="warnSoft">@color/warn_soft</item>
+        <item name="dangerColor">@color/danger_color</item>
+        <item name="dangerSoft">@color/danger_soft</item>
+        <item name="switchTrackOff">@color/switch_track_off</item>
+        <item name="heroStart">@color/hero_start</item>
+        <item name="heroEnd">@color/hero_end</item>
+        <item name="heroPausedStart">@color/hero_paused_start</item>
+        <item name="heroPausedEnd">@color/hero_paused_end</item>
+        <item name="heroWarnStart">@color/hero_warn_start</item>
+        <item name="heroWarnEnd">@color/hero_warn_end</item>
+        <item name="heroAlertStart">@color/hero_alert_start</item>
+        <item name="heroAlertEnd">@color/hero_alert_end</item>
         <item name="barBg">@color/bar_bg</item>
         <item name="barSelected">@color/bar_selected</item>
         <item name="barText">@color/bar_text</item>
@@ -21,38 +45,92 @@
 
     <!-- 强制浅色 -->
     <style name="AppThemeLight" parent="@android:style/Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">#FFFFFFFF</item>
-        <item name="android:colorBackground">#FFFFFFFF</item>
-        <item name="android:colorAccent">#FF00897B</item>
-        <item name="android:statusBarColor">#FFFFFFFF</item>
+        <item name="android:windowBackground">#FFF4F6FA</item>
+        <item name="android:colorBackground">#FFF4F6FA</item>
+        <item name="android:colorAccent">#FF1C6BFF</item>
+        <item name="android:statusBarColor">#FFF4F6FA</item>
+        <item name="android:navigationBarColor">#FFF4F6FA</item>
         <item name="android:windowLightStatusBar">true</item>
-        <item name="appBg">#FFFFFFFF</item>
-        <item name="textSecondary">#FF666666</item>
-        <item name="textHint">#FF888888</item>
-        <item name="textBody">#FF444444</item>
-        <item name="textFooter">#FF999999</item>
-        <item name="barBg">#FFF4F4F4</item>
-        <item name="barSelected">#FFDFF3F0</item>
-        <item name="barText">#FF444444</item>
-        <item name="barTextSelected">#FF00695C</item>
+        <item name="appBg">#FFF4F6FA</item>
+        <item name="cardBg">#FFFFFFFF</item>
+        <item name="cardStroke">#FFE6EAF2</item>
+        <item name="surfaceSubtle">#FFEEF2F8</item>
+        <item name="dividerColor">#FFEDF1F7</item>
+        <item name="textPrimary">#FF0F172A</item>
+        <item name="textSecondary">#FF475569</item>
+        <item name="textHint">#FF94A3B8</item>
+        <item name="textBody">#FF334155</item>
+        <item name="textFooter">#FF94A3B8</item>
+        <item name="accentColor">#FF1C6BFF</item>
+        <item name="accentSoft">#FFEBF2FF</item>
+        <item name="accentText">#FF1557D6</item>
+        <item name="okColor">#FF0D9F6E</item>
+        <item name="okSoft">#FFE6F7F0</item>
+        <item name="warnColor">#FFD97706</item>
+        <item name="warnSoft">#FFFEF3E2</item>
+        <item name="dangerColor">#FFE11D48</item>
+        <item name="dangerSoft">#FFFFEBEF</item>
+        <item name="switchTrackOff">#FFCBD5E1</item>
+        <item name="heroStart">#FF1C6BFF</item>
+        <item name="heroEnd">#FF114CC9</item>
+        <item name="heroPausedStart">#FF475569</item>
+        <item name="heroPausedEnd">#FF334155</item>
+        <item name="heroWarnStart">#FFD97706</item>
+        <item name="heroWarnEnd">#FFB45309</item>
+        <item name="heroAlertStart">#FFE11D48</item>
+        <item name="heroAlertEnd">#FFBE123C</item>
+        <item name="barBg">#FFEEF2F8</item>
+        <item name="barSelected">#FFEBF2FF</item>
+        <item name="barText">#FF475569</item>
+        <item name="barTextSelected">#FF1557D6</item>
     </style>
 
     <!-- 强制深色 -->
     <style name="AppThemeDark" parent="@android:style/Theme.Material.NoActionBar">
-        <item name="android:windowBackground">#FF121212</item>
-        <item name="android:colorBackground">#FF121212</item>
-        <item name="android:colorAccent">#FF4DB6AC</item>
-        <item name="android:statusBarColor">#FF121212</item>
+        <item name="android:windowBackground">#FF0B0F17</item>
+        <item name="android:colorBackground">#FF0B0F17</item>
+        <item name="android:colorAccent">#FF4C8DFF</item>
+        <item name="android:statusBarColor">#FF0B0F17</item>
+        <item name="android:navigationBarColor">#FF0B0F17</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="appBg">#FF121212</item>
-        <item name="textSecondary">#FFB0B0B0</item>
-        <item name="textHint">#FF9E9E9E</item>
-        <item name="textBody">#FFC7C7C7</item>
-        <item name="textFooter">#FF8A8A8A</item>
-        <item name="barBg">#FF1E1E1E</item>
-        <item name="barSelected">#FF1F3B36</item>
-        <item name="barText">#FFCCCCCC</item>
-        <item name="barTextSelected">#FF4DB6AC</item>
+        <item name="appBg">#FF0B0F17</item>
+        <item name="cardBg">#FF151B26</item>
+        <item name="cardStroke">#FF232C3D</item>
+        <item name="surfaceSubtle">#FF1D2534</item>
+        <item name="dividerColor">#FF202939</item>
+        <item name="textPrimary">#FFF1F5F9</item>
+        <item name="textSecondary">#FF94A3B8</item>
+        <item name="textHint">#FF64748B</item>
+        <item name="textBody">#FFCBD5E1</item>
+        <item name="textFooter">#FF64748B</item>
+        <item name="accentColor">#FF4C8DFF</item>
+        <item name="accentSoft">#FF182A4A</item>
+        <item name="accentText">#FF7FB0FF</item>
+        <item name="okColor">#FF34D399</item>
+        <item name="okSoft">#FF102E24</item>
+        <item name="warnColor">#FFFBBF24</item>
+        <item name="warnSoft">#FF332510</item>
+        <item name="dangerColor">#FFFB7185</item>
+        <item name="dangerSoft">#FF351620</item>
+        <item name="switchTrackOff">#FF334155</item>
+        <item name="heroStart">#FF1B4FD4</item>
+        <item name="heroEnd">#FF113494</item>
+        <item name="heroPausedStart">#FF273142</item>
+        <item name="heroPausedEnd">#FF1B2330</item>
+        <item name="heroWarnStart">#FF92400E</item>
+        <item name="heroWarnEnd">#FF6B2E08</item>
+        <item name="heroAlertStart">#FF9F1239</item>
+        <item name="heroAlertEnd">#FF750E2A</item>
+        <item name="barBg">#FF1D2534</item>
+        <item name="barSelected">#FF182A4A</item>
+        <item name="barText">#FF94A3B8</item>
+        <item name="barTextSelected">#FF7FB0FF</item>
+    </style>
+
+    <!-- 底部面板滑入滑出动画 -->
+    <style name="BottomSheetAnim">
+        <item name="android:windowEnterAnimation">@anim/sheet_enter</item>
+        <item name="android:windowExitAnimation">@anim/sheet_exit</item>
     </style>
 
 </resources>

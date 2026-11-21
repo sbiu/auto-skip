@@ -1,27 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- 核心标识与无障碍声明（供 AndroidManifest / accessibility_service_config 引用） -->
     <string name="app_name">张跳跳</string>
     <string name="service_label">张跳跳 开屏跳过</string>
     <string name="service_description">仅用于识别并点击各应用开屏广告上的“跳过/关闭广告”按钮。不读取、不保存、不上传任何页面内容。</string>
 
-    <string name="title">张跳跳</string>
-    <string name="subtitle">只做一件事：跳过开屏广告</string>
-
-    <string name="status_on">无障碍服务：已开启</string>
-    <string name="status_off">无障碍服务：未开启</string>
-    <string name="status_paused">无障碍服务：已开启 · 跳过已暂停</string>
-    <string name="switch_label">启用跳过</string>
-    <string name="switch_guard">常驻通知守护（防系统冻结）</string>
-    <string name="hint_guard_notification">通知被收进「更多通知」时：系统设置 → 通知管理 → 张跳跳 → 提升重要性</string>
-    <string name="btn_battery">省电策略：设为无限制</string>
-    <string name="btn_autostart">自启动设置（MIUI）</string>
-    <string name="open_settings">去开启无障碍服务</string>
-    <string name="hint">工作原理：应用进入前台后的 15 秒内（冷启动、从后台/最近任务回来、热启动广告都算），读取当前窗口节点（含浮层窗口），匹配“跳过 / 跳过广告 / 关闭 / 关闭广告 / 4关闭 / skip”等文案并点击；窗口期结束立即停止扫描。关闭上方开关后，服务不再接收任何无障碍事件，零开销。\n\n省电设计：只订阅窗口类事件、100ms 合并、单次前台会话最多扫描 100 次、点击后冷却 1.5 秒、常驻通知守护（可在主界面关闭）、无轮询、无网络权限。</string>
-    <string name="counter_zero">本次安装已跳过 0 次</string>
-    <string name="counter_format">本次安装已跳过 %1$d 次（最近：%2$s）</string>
-    <string name="theme_light">浅色</string>
-    <string name="theme_dark">深色</string>
-    <string name="theme_auto">跟随系统</string>
+    <!-- 通知栏文案（供 GuardService / notification_guard 引用，保持兼容） -->
     <string name="notif_block">误跳</string>
     <string name="notif_title_run">已跳过 %1$d 次</string>
     <string name="notif_title_paused">已暂停跳过</string>
@@ -32,14 +16,122 @@
     <string name="notif_toggle_desc">开关跳过</string>
     <string name="action_pause">暂停跳过</string>
     <string name="action_resume">恢复跳过</string>
-    <string name="section_excluded">不跳过名单（这些应用/页面不再自动跳过）</string>
-    <string name="btn_add_app">添加应用到不跳过名单</string>
+
+    <!-- 顶栏与外观 -->
+    <string name="title">张跳跳</string>
+    <string name="subtitle">静默守护 · 跳过开屏广告</string>
+    <string name="theme_light">浅色</string>
+    <string name="theme_dark">深色</string>
+    <string name="theme_auto">自动</string>
+    <string name="theme_sheet_title">外观主题</string>
+    <string name="theme_auto_full">跟随系统</string>
+    <string name="theme_auto_desc">随系统深浅色模式自动切换</string>
+    <string name="theme_light_full">浅色外观</string>
+    <string name="theme_light_desc">柔和瓷白与清透卡片层次</string>
+    <string name="theme_dark_full">深色外观</string>
+    <string name="theme_dark_desc">暗夜曜石背景，夜间更护眼</string>
+
+    <!-- Hero 状态主卡片 -->
+    <string name="hero_badge_active">保护中</string>
+    <string name="hero_title_active">开屏跳过运行中</string>
+    <string name="hero_sub_active">无障碍已连接 · 打开应用自动跳过</string>
+
+    <string name="hero_badge_paused">已暂停</string>
+    <string name="hero_title_paused">跳过功能已暂停</string>
+    <string name="hero_sub_paused">当前不接收任何无障碍事件，零开销</string>
+
+    <string name="hero_badge_waiting">等待连接</string>
+    <string name="hero_title_waiting">等待无障碍服务绑定</string>
+    <string name="hero_sub_waiting">系统开关已打开，请稍候或点右侧检查</string>
+
+    <string name="hero_badge_off">未开启</string>
+    <string name="hero_title_off">请先开启无障碍服务</string>
+    <string name="hero_sub_off">授权后自动识别并跳过开屏广告</string>
+
+    <string name="hero_cta_enable">去开启</string>
+    <string name="hero_cta_check">去检查</string>
+
+    <string name="metric_skips">累计跳过</string>
+    <string name="metric_saved">预计省时</string>
+    <string name="metric_last">最近跳过</string>
+    <string name="metric_none">暂无</string>
+
+    <!-- 守护与运行环境 -->
+    <string name="guard_title">常驻通知守护</string>
+    <string name="guard_sub_on">前台保活，防止后台被系统冻结</string>
+    <string name="guard_sub_off">已关闭 · 系统可能回收后台进程</string>
+    <string name="guard_sub_no_perm">通知权限未开启，点击前往开启</string>
+
+    <string name="env_ready">运行环境正常 · 无障碍与省电已就绪</string>
+    <string name="env_issues">有 %1$d 项运行权限建议优化</string>
+    <string name="env_expand">权限设置</string>
+    <string name="env_collapse">收起</string>
+
+    <string name="item_a11y_title">无障碍服务</string>
+    <string name="item_a11y_sub">用于识别并点击开屏广告的跳过按钮</string>
+    <string name="item_battery_title">省电策略</string>
+    <string name="item_battery_sub">设为无限制，避免锁屏后被系统断连</string>
+    <string name="item_autostart_title">后台自启动</string>
+    <string name="item_autostart_sub_miui">小米 / HyperOS 建议开启以稳定保活</string>
+    <string name="item_autostart_sub_generic">允许开机与后台恢复守护服务</string>
+    <string name="item_notif_title">通知显示设置</string>
+    <string name="item_notif_sub">通知被折进「更多通知」时可提升重要性</string>
+
+    <string name="pill_connected">已连接</string>
+    <string name="pill_waiting">等待连接</string>
+    <string name="pill_off">未开启</string>
+    <string name="pill_ok">已无限制</string>
+    <string name="pill_todo">待设置</string>
+    <string name="pill_check">去查看</string>
+    <string name="pill_allowed">已开启</string>
+    <string name="pill_denied">未授权</string>
+
+    <!-- 分段列表：最近跳过 / 不跳过名单 -->
+    <string name="tab_recent">最近跳过</string>
+    <string name="tab_excluded">不跳过名单</string>
+    <string name="recent_hint">误跳时点击条目可快速加入屏蔽</string>
+    <string name="excluded_hint">名单内的应用或页面不会自动跳过</string>
+    <string name="btn_clear">清空</string>
+    <string name="btn_add_app">添加应用</string>
+    <string name="btn_shield">屏蔽</string>
+    <string name="btn_shielded">已屏蔽</string>
     <string name="btn_remove">移除</string>
-    <string name="section_recent">最近跳过（误跳了点这里记住）</string>
-    <string name="btn_block_scene">不再跳过此场景</string>
-    <string name="btn_block_app">不再跳过此应用</string>
-    <string name="empty_excluded">暂无，点上方按钮添加应用</string>
-    <string name="empty_recent">还没有跳过记录</string>
-    <string name="dialog_pick_app">选择要排除的应用</string>
-    <string name="footer">v1.9 · 无网络权限 · 不收集任何数据</string>
+    <string name="btn_show_more">展开其余 %1$d 条记录</string>
+    <string name="btn_show_less">收起部分记录</string>
+    <string name="tag_app_rule">整应用</string>
+    <string name="tag_scene_rule">指定页面</string>
+    <string name="empty_recent_title">还没有跳过记录</string>
+    <string name="empty_recent_desc">打开带开屏广告的应用后会自动记录在这里</string>
+    <string name="empty_excluded_title">暂无不跳过规则</string>
+    <string name="empty_excluded_desc">点右上角「添加应用」或从最近跳过中屏蔽</string>
+
+    <!-- 屏蔽底部面板 -->
+    <string name="shield_sheet_title">遇到误跳？选择屏蔽范围</string>
+    <string name="shield_scene_title">仅屏蔽此页面</string>
+    <string name="shield_scene_desc">仅在 %1$s 不再跳过，仍保留该应用开屏跳过</string>
+    <string name="shield_app_title">屏蔽整个应用</string>
+    <string name="shield_app_desc">以后不再对 %1$s 执行任何自动跳过</string>
+    <string name="action_cancel">取消</string>
+    <string name="action_done">完成</string>
+
+    <!-- 应用选择器 -->
+    <string name="picker_title">选择不跳过的应用</string>
+    <string name="picker_search_hint">搜索应用名称或包名</string>
+    <string name="picker_loading">正在读取已安装应用…</string>
+    <string name="picker_empty">没有找到匹配的应用</string>
+
+    <!-- 页底入口与面板 -->
+    <string name="util_diag_title">运行诊断</string>
+    <string name="util_info_title">工作原理</string>
+    <string name="util_info_sub">本地运行 · 零联网</string>
+    <string name="diag_title">运行诊断信息</string>
+    <string name="diag_copy_snapshot">复制未命中快照</string>
+    <string name="diag_copied">已复制窗口节点快照</string>
+    <string name="diag_no_snapshot">当前没有未命中节点快照</string>
+    <string name="info_title">工作原理与隐私承诺</string>
+
+    <string name="clear_recent_title">清空最近跳过记录？</string>
+    <string name="clear_recent_msg">仅清空下方记录列表，不会影响累计跳过统计与不跳过名单。</string>
+
+    <string name="footer">张跳跳 v1.9 · 无网络权限 · 纯本地运行</string>
 </resources>
