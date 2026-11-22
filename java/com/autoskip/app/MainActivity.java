@@ -1,10 +1,12 @@
 package com.autoskip.app;
 
 import android.app.Activity;
+import android.app.AppOpsManager;
 import android.app.Dialog;
 import android.app.NotificationManager;
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -33,6 +35,7 @@ import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.lang.reflect.Method;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -121,6 +124,7 @@ public class MainActivity extends Activity {
     private Boolean userEnvExpanded;
     private String lastEnvSignature = "";
     private String lastListSignature = "";
+    private Dialog activeDialog;
 
     private final Runnable liveTick = new Runnable() {
         @Override
@@ -181,8 +185,33 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        dismissActiveDialog();
         handler.removeCallbacksAndMessages(null);
         super.onDestroy();
+    }
+
+    private void trackDialog(Dialog d) {
+        dismissActiveDialog();
+        activeDialog = d;
+    }
+
+    private void showTrackedDialog(Dialog d) {
+        trackDialog(d);
+        if (!isFinishing() && !isDestroyed()) {
+            d.show();
+        }
+    }
+
+    private void dismissActiveDialog() {
+        if (activeDialog != null) {
+            try {
+                if (activeDialog.isShowing()) {
+                    activeDialog.dismiss();
+                }
+            } catch (Throwable ignored) {
+            }
+            activeDialog = null;
+        }
     }
 
     private void bindViews() {
@@ -413,12 +442,12 @@ public class MainActivity extends Activity {
             @Override
             public void onClick(View v) {
                 UiKit.haptic(v);
-                AppPickerSheet.show(MainActivity.this, new AppPickerSheet.OnChangedListener() {
+                trackDialog(AppPickerSheet.show(MainActivity.this, new AppPickerSheet.OnChangedListener() {
                     @Override
                     public void onRulesChanged() {
                         refresh(true);
                     }
-                });
+                }));
             }
         });
 
@@ -466,6 +495,7 @@ public class MainActivity extends Activity {
         boolean guardEnabled = SkipState.isGuardEnabled(this);
         boolean batteryOk = isIgnoringBatteryOptimizations();
         boolean notifOk = areNotificationsEnabledCompat();
+        int autostartState = checkMiuiAutostartState();
 
         SharedPreferences sp = getSharedPreferences(PREFS, MODE_PRIVATE);
         int count = sp.getInt("skip_count", 0);
@@ -473,7 +503,8 @@ public class MainActivity extends Activity {
         int events = sp.getInt("dbg_events", 0);
 
         updateHeroCard(serviceEnabled, connected, skipEnabled, count, lastPkg);
-        updateGuardAndEnvCard(serviceEnabled, connected, guardEnabled, batteryOk, notifOk, forceRebuildLists);
+        updateGuardAndEnvCard(serviceEnabled, connected, guardEnabled, batteryOk, notifOk,
+                autostartState, forceRebuildLists);
         updateActivityCard(forceRebuildLists);
 
         String diagStatus = connected ? getString(R.string.pill_connected)
@@ -556,7 +587,7 @@ public class MainActivity extends Activity {
 
     private void updateGuardAndEnvCard(boolean serviceEnabled, boolean connected,
                                        boolean guardEnabled, boolean batteryOk,
-                                       boolean notifOk, boolean forceRebuild) {
+                                       boolean notifOk, int autostartState, boolean forceRebuild) {
         bindingSwitch = true;
         guardSwitch.setChecked(guardEnabled);
         bindingSwitch = false;
@@ -579,6 +610,7 @@ public class MainActivity extends Activity {
 
         boolean a11yOk = serviceEnabled && connected;
         int issues = (!a11yOk ? 1 : 0) + (!batteryOk ? 1 : 0)
+                + (autostartState == 0 ? 1 : 0)
                 + (guardEnabled && !notifOk ? 1 : 0);
 
         boolean expanded = userEnvExpanded != null ? userEnvExpanded : (issues > 0);
@@ -597,16 +629,17 @@ public class MainActivity extends Activity {
         envDetails.setVisibility(expanded ? View.VISIBLE : View.GONE);
 
         String sig = serviceEnabled + "|" + connected + "|" + guardEnabled + "|"
-                + batteryOk + "|" + notifOk + "|" + expanded;
+                + batteryOk + "|" + notifOk + "|" + autostartState + "|" + expanded;
         if (!expanded || (!forceRebuild && sig.equals(lastEnvSignature))) {
             return;
         }
         lastEnvSignature = sig;
-        rebuildEnvDetails(serviceEnabled, connected, guardEnabled, batteryOk, notifOk);
+        rebuildEnvDetails(serviceEnabled, connected, guardEnabled, batteryOk, notifOk, autostartState);
     }
 
     private void rebuildEnvDetails(boolean serviceEnabled, boolean connected,
-                                   boolean guardEnabled, boolean batteryOk, boolean notifOk) {
+                                   boolean guardEnabled, boolean batteryOk, boolean notifOk,
+                                   int autostartState) {
         envDetails.removeAllViews();
 
         int okColor = UiKit.themeColor(this, R.attr.okColor, 0xFF0D9F6E);
@@ -655,12 +688,18 @@ public class MainActivity extends Activity {
                 }));
 
         // 3. 后台自启动
+        int autoIconTint = autostartState == 1 ? okColor : (autostartState == 0 ? warnColor : accent);
+        int autoIconBg = autostartState == 1 ? okSoft : (autostartState == 0 ? warnSoft : accentSoft);
+        String autoPill = autostartState == 1 ? getString(R.string.pill_allowed)
+                : (autostartState == 0 ? getString(R.string.pill_todo) : getString(R.string.pill_check));
+        int autoPillFg = autostartState == 1 ? okColor : (autostartState == 0 ? warnColor : textSecondary);
+        int autoPillBg = autostartState == 1 ? okSoft : (autostartState == 0 ? warnSoft : subtleBg);
         envDetails.addView(buildEnvRow(
-                R.drawable.ic_autostart, accent, accentSoft,
+                R.drawable.ic_autostart, autoIconTint, autoIconBg,
                 getString(R.string.item_autostart_title),
                 getString(isXiaomiDevice()
                         ? R.string.item_autostart_sub_miui : R.string.item_autostart_sub_generic),
-                getString(R.string.pill_check), textSecondary, subtleBg,
+                autoPill, autoPillFg, autoPillBg,
                 new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
@@ -1335,7 +1374,7 @@ public class MainActivity extends Activity {
         clp.topMargin = UiKit.dp(this, 8);
         content.addView(cancel, clp);
 
-        dialog.show();
+        showTrackedDialog(dialog);
     }
 
     private View buildSheetOption(int iconRes, int iconTint, int iconBg,
@@ -1488,7 +1527,7 @@ public class MainActivity extends Activity {
             }
             content.addView(row, rlp);
         }
-        dialog.show();
+        showTrackedDialog(dialog);
     }
 
     private void showDiagnosticsSheet() {
@@ -1510,7 +1549,9 @@ public class MainActivity extends Activity {
         String homePkg = sp.getString("home_pkg", "-");
         final String tree = sp.getString("dbg_tree", "");
         boolean connected = SkipService.isConnected();
-        boolean batteryOk = isIgnoringBatteryOptimizations();
+        boolean pmOk = isPowerManagerIgnoringBattery();
+        boolean milletOk = !isXiaomiDevice() || isMilletNoRestrictApp();
+        boolean batteryOk = pmOk && milletOk;
 
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
@@ -1534,8 +1575,10 @@ public class MainActivity extends Activity {
 
         addDiagRow(kvCard, "服务连接", connected ? "已连接" : "未连接",
                 connected ? okColor : dangerColor, textSecondary, false, divider);
-        addDiagRow(kvCard, "省电策略", batteryOk ? "已无限制" : "受系统限制",
-                batteryOk ? okColor : textPrimary, textSecondary, true, divider);
+        String batteryDesc = batteryOk ? "已无限制"
+                : (pmOk ? "受 HyperOS 冻结限制" : "受系统限制");
+        addDiagRow(kvCard, "省电策略", batteryDesc,
+                batteryOk ? okColor : dangerColor, textSecondary, true, divider);
         addDiagRow(kvCard, "累计事件", events + " 次", textPrimary, textSecondary, true, divider);
         addDiagRow(kvCard, "最近事件", lastEvent, textPrimary, textSecondary, true, divider);
         addDiagRow(kvCard, "最近扫描", SkipState.lastScan, textPrimary, textSecondary, true, divider);
@@ -1635,7 +1678,7 @@ public class MainActivity extends Activity {
             content.addView(close, clp);
         }
 
-        dialog.show();
+        showTrackedDialog(dialog);
     }
 
     private void addDiagRow(LinearLayout parent, String key, String val,
@@ -1730,7 +1773,7 @@ public class MainActivity extends Activity {
         dlp.topMargin = UiKit.dp(this, 6);
         content.addView(done, dlp);
 
-        dialog.show();
+        showTrackedDialog(dialog);
     }
 
     private View buildInfoCard(int iconRes, int iconTint, int iconBg,
@@ -1881,7 +1924,7 @@ public class MainActivity extends Activity {
 
         content.addView(btns, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        dialog.show();
+        showTrackedDialog(dialog);
     }
 
     // ---- 主题与系统设置跳转（完整沿用原有权限逻辑） ----
@@ -1930,16 +1973,51 @@ public class MainActivity extends Activity {
     }
 
     private void requestBatteryExemption() {
+        if (isXiaomiDevice() && isPowerManagerIgnoringBattery() && openXiaomiBatteryConfig()) {
+            return;
+        }
         try {
             Intent i = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
                     Uri.parse("package:" + getPackageName()));
             startActivity(i);
-        } catch (Throwable t) {
-            try {
-                startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
-            } catch (Throwable ignored) {
-            }
+            return;
+        } catch (Throwable ignored) {
         }
+        if (isXiaomiDevice() && openXiaomiBatteryConfig()) {
+            return;
+        }
+        try {
+            startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private boolean openXiaomiBatteryConfig() {
+        try {
+            Intent i = new Intent("miui.intent.action.POWER_HIDE_MODE_APP_LIST");
+            i.setComponent(new ComponentName("com.miui.powerkeeper",
+                    "com.miui.powerkeeper.ui.HiddenAppsConfigActivity"));
+            i.putExtra("package_name", getPackageName());
+            i.putExtra("package_label", getString(R.string.app_name));
+            startActivity(i);
+            return true;
+        } catch (Throwable ignored) {
+        }
+        try {
+            Intent i = new Intent();
+            i.setComponent(new ComponentName("com.miui.powerkeeper",
+                    "com.miui.powerkeeper.ui.HiddenAppsContainerManagementActivity"));
+            startActivity(i);
+            return true;
+        } catch (Throwable ignored) {
+        }
+        try {
+            startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:" + getPackageName())));
+            return true;
+        } catch (Throwable ignored) {
+        }
+        return false;
     }
 
     private void openAutostartSettings() {
@@ -1993,13 +2071,60 @@ public class MainActivity extends Activity {
                 || enabled.contains(getPackageName() + "/.SkipService");
     }
 
-    private boolean isIgnoringBatteryOptimizations() {
+    private boolean isPowerManagerIgnoringBattery() {
         try {
             PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
             return pm != null && pm.isIgnoringBatteryOptimizations(getPackageName());
         } catch (Throwable t) {
             return false;
         }
+    }
+
+    private boolean isMilletNoRestrictApp() {
+        try {
+            String list = Settings.System.getString(
+                    getContentResolver(), "MILLET_NO_RESTRICT_APP");
+            if (list == null || list.trim().isEmpty()) {
+                return true;
+            }
+            String me = getPackageName();
+            for (String item : list.split(",")) {
+                if (me.equals(item.trim())) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (Throwable t) {
+            return true;
+        }
+    }
+
+    private boolean isIgnoringBatteryOptimizations() {
+        if (!isPowerManagerIgnoringBattery()) {
+            return false;
+        }
+        return !isXiaomiDevice() || isMilletNoRestrictApp();
+    }
+
+    /** @return 1 已开启，0 未授权，-1 未知（非小米或受系统反射限制）。 */
+    private int checkMiuiAutostartState() {
+        if (!isXiaomiDevice()) {
+            return -1;
+        }
+        try {
+            AppOpsManager aom = (AppOpsManager) getSystemService(APP_OPS_SERVICE);
+            if (aom == null) {
+                return -1;
+            }
+            Method m = AppOpsManager.class.getMethod(
+                    "checkOpNoThrow", int.class, int.class, String.class);
+            Object res = m.invoke(aom, 10008, android.os.Process.myUid(), getPackageName());
+            if (res instanceof Integer) {
+                return ((Integer) res) == AppOpsManager.MODE_ALLOWED ? 1 : 0;
+            }
+        } catch (Throwable ignored) {
+        }
+        return -1;
     }
 
     private boolean areNotificationsEnabledCompat() {

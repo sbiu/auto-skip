@@ -68,7 +68,7 @@ final class AppPickerSheet {
     private AppPickerSheet() {
     }
 
-    static void show(final Activity activity, final OnChangedListener listener) {
+    static Dialog show(final Activity activity, final OnChangedListener listener) {
         final int textPrimary = UiKit.themeColor(activity, R.attr.textPrimary, 0xFF0F172A);
         final int textSecondary = UiKit.themeColor(activity, R.attr.textSecondary, 0xFF475569);
         final int textHint = UiKit.themeColor(activity, R.attr.textHint, 0xFF94A3B8);
@@ -304,6 +304,7 @@ final class AppPickerSheet {
                 });
             }
         });
+        return dialog;
     }
 
     private static void applyFilter(List<AppItem> all, List<AppItem> filtered, String query,
